@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-@Transactional(readOnly = true)
 public class DiaryService {
 
     private final DiaryRepository diaryRepository;
@@ -48,11 +47,11 @@ public class DiaryService {
     @Transactional
     @Scheduled(cron = "0 0 1 * * *")
     public void saveWeatherDate() {
+        LocalDate date = LocalDate.now();
         logger.info("날씨 데이터 불러오기 완료");
-        dateWeatherRepository.save(getWeatherFromApi());
+        dateWeatherRepository.save(getWeatherFromApi(date));
     }
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
     public void createDairy(LocalDate date, String text) {
         logger.info("started to create diary");
         //open weather 데이터 가져오기
@@ -60,13 +59,14 @@ public class DiaryService {
 
         //파싱된 데이터 + 일기값 우리 db에 넣기
         Diary nowDiary = new Diary();
+        nowDiary.setDate(date);
         nowDiary.setDateWeather(dateWeather);
         nowDiary.setText(text);
         diaryRepository.save(nowDiary);
         logger.info("end to create diary");
     }
 
-    private DateWeather getWeatherFromApi() {
+    private DateWeather getWeatherFromApi(LocalDate date) {
         //open weather 데이터 가져오기
         String weatherData = getWeatherString();
 
@@ -74,7 +74,7 @@ public class DiaryService {
         Map<String, Object> parsedWeather = parseWeather(weatherData);
 
         DateWeather dateWeather = new DateWeather();
-        dateWeather.setDate(LocalDate.now());
+        dateWeather.setDate(date);
         dateWeather.setWeather(parsedWeather.get("main").toString());
         dateWeather.setIcon(parsedWeather.get("icon").toString());
         dateWeather.setTemperature((Double) parsedWeather.get("temp"));
@@ -85,7 +85,7 @@ public class DiaryService {
         List<DateWeather> dateWeatherListFromDB = dateWeatherRepository.findAllByDate(date);
         if(dateWeatherListFromDB.size() == 0 ) {
             // 새로 api에서 날씨 정보를 가져와야 한다
-            return getWeatherFromApi();
+            return getWeatherFromApi(date);
         } else {
             return dateWeatherListFromDB.get(0);
         }
